@@ -9,6 +9,9 @@ from tensorflow import keras
 # Cargar datos experimentales
 df = pd.read_excel('digestion.xlsx')
 
+# Mostrar nombres exactos de las columnas para depuración
+print('Columnas disponibles en el archivo:', df.columns.tolist())
+
 # Codificar variables categóricas
 le_fase = LabelEncoder()
 le_enzima = LabelEncoder()
@@ -19,9 +22,18 @@ df['enzima'] = le_enzima.fit_transform(df['enzima'])
 
 # Gráfica 1: Tamaño de partícula vs tiempo por fase
 plt.figure(figsize=(10,6))
-for fase in df['fase'].unique():
-	datos_fase = df[df['fase'] == fase]
-	plt.plot(datos_fase['tiempo'], datos_fase['tamaño_particula'], marker='o', label=f"Fase {fase}")
+fase_labels = {0: 'inicial', 1: 'boca', 2: 'estómago', 3: 'intestino'}
+orden_fases = [0, 1, 2, 3]
+for fase in orden_fases:
+	if fase in df['fase'].unique():
+		datos_fase = df[df['fase'] == fase]
+		datos_fase = datos_fase.sort_values('tiempo')
+		plt.plot(datos_fase['tiempo'], datos_fase['tamaño_particula'], marker='o', linestyle='-', label=fase_labels[fase])
+plt.xlabel('Tiempo (min)')
+plt.ylabel('Tamaño de partícula (nm)')
+plt.title('Tamaño de partícula de SNEDDS durante digestión')
+plt.legend(title='Fase', loc='best')
+plt.show()
 plt.xlabel('Tiempo (min)')
 plt.ylabel('Tamaño de partícula (nm)')
 plt.title('Tamaño de partícula de SNEDDS durante digestión')
@@ -30,9 +42,16 @@ plt.show()
 
 # Gráfica 2: Índice de polidispersidad vs tiempo por fase
 plt.figure(figsize=(10,6))
-for fase in df['fase'].unique():
-	datos_fase = df[df['fase'] == fase]
-	plt.plot(datos_fase['tiempo'], datos_fase['indice_polidispersidad'], marker='o', label=f"Fase {fase}")
+for fase in orden_fases:
+	if fase in df['fase'].unique():
+		datos_fase = df[df['fase'] == fase]
+		datos_fase = datos_fase.sort_values('tiempo')
+		plt.plot(datos_fase['tiempo'], datos_fase['indice_polidispersidad'], marker='o', linestyle='-', label=fase_labels[fase])
+plt.xlabel('Tiempo (min)')
+plt.ylabel('Índice de polidispersidad (PDI)')
+plt.title('Índice de polidispersidad de SNEDDS durante digestión')
+plt.legend(title='Fase', loc='best')
+plt.show()
 plt.xlabel('Tiempo (min)')
 plt.ylabel('Índice de polidispersidad (PDI)')
 plt.title('Índice de polidispersidad de SNEDDS durante digestión')
@@ -40,7 +59,7 @@ plt.legend()
 plt.show()
 
 # Seleccionar variables de entrada y salida
-X = df[['fase', 'tiempo', 'tamaño_particula', 'indice_polidispersidad', 'enzima', 'pH', 'trigliceridos', 'tween80', 'cremophor', 'polietilenglicol', 'camptotecina']]
+X = df[['fase', 'tiempo', 'tamaño_particula', 'indice_polidispersidad', 'enzima', 'ph', 'agitacion', 'temperatura']]
 y = df['bioaccesibilidad']  # Cambia si tu columna objetivo tiene otro nombre
 
 # Escalar variables
