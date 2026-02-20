@@ -116,8 +116,8 @@ df['fase'] = le_fase.fit_transform(df['fase'])
 df['enzima'] = le_enzima.fit_transform(df['enzima'])
 
 # Seleccionar variables de entrada y salida
-X = df[['fase', 'tiempo', 'tamaño_particula', 'indice_polidispersidad', 'enzima', 'pH']]
-y = df['bioaccesibilidad']  # Cambia si tu columna objetivo tiene otro nombre
+X = df[['fase', 'tiempo', 'tamaño_particula', 'indice_polidispersidad', 'enzima', 'ph']]
+y = df['tamaño_particula']  # Cambia aquí si quieres predecir otra columna existente
 
 # Escalar variables
 scaler = StandardScaler()
