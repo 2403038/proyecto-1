@@ -480,3 +480,121 @@ summary_pdi.to_excel(
     "tabla_estadistica_PDI_SNEDDS.xlsx",
     index=False
 )
+
+# ==========================================
+# FIGURA PROFESIONAL: TAMAÑO + PDI (CORREGIDA)
+# ==========================================
+
+# Orden fisiológico
+orden_fases = ["Inicial", "Boca", "Estómago", "Intestino"]
+
+# Asegurar orden correcto en ambas tablas
+summary["fase_fisiologica"] = pd.Categorical(
+    summary["fase_fisiologica"],
+    categories=orden_fases,
+    ordered=True
+)
+summary = summary.sort_values("fase_fisiologica")
+
+summary_pdi["fase_fisiologica"] = pd.Categorical(
+    summary_pdi["fase_fisiologica"],
+    categories=orden_fases,
+    ordered=True
+)
+summary_pdi = summary_pdi.sort_values("fase_fisiologica")
+
+# Crear figura con dos paneles
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+# ---------------------------
+# Panel 1: Tamaño de partícula
+# ---------------------------
+axes[0].errorbar(
+    summary["fase_fisiologica"],
+    summary["media_tamano"],
+    yerr=summary["std_tamano"],
+    marker='o',
+    capsize=5,
+    linewidth=2
+)
+
+axes[0].set_ylabel("Tamaño de partícula (nm)")
+axes[0].set_title("Evolución estructural del SNEDDS durante la digestión in vitro")
+axes[0].grid(True, alpha=0.3)
+
+# ---------------------------
+# Panel 2: PDI
+# ---------------------------
+axes[1].errorbar(
+    summary_pdi["fase_fisiologica"],
+    summary_pdi["media_pdi"],
+    yerr=summary_pdi["std_pdi"],
+    marker='s',
+    capsize=5,
+    linewidth=2,
+    color="tab:orange"
+)
+
+axes[1].set_ylabel("Índice de polidispersidad (PDI)")
+axes[1].set_xlabel("Fase fisiológica")
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+ 
+# ==========================================
+# FIGURA PROFESIONAL FINAL
+# ==========================================
+
+orden_fases = ["Inicial", "Boca", "Estómago", "Intestino"]
+
+# Ordenar tamaño
+summary["fase_fisiologica"] = pd.Categorical(
+    summary["fase_fisiologica"],
+    categories=orden_fases,
+    ordered=True
+)
+summary = summary.sort_values("fase_fisiologica")
+
+# Ordenar PDI
+summary_pdi["fase_fisiologica"] = pd.Categorical(
+    summary_pdi["fase_fisiologica"],
+    categories=orden_fases,
+    ordered=True
+)
+summary_pdi = summary_pdi.sort_values("fase_fisiologica")
+
+# Crear figura
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+# Tamaño
+axes[0].errorbar(
+    summary["fase_fisiologica"],
+    summary["media_tamano"],
+    yerr=summary["std_tamano"],
+    marker='o',
+    capsize=5,
+    linewidth=2
+)
+
+axes[0].set_ylabel("Tamaño de partícula (nm)")
+axes[0].set_title("Evolución estructural del SNEDDS durante la digestión in vitro")
+axes[0].grid(True, alpha=0.3)
+
+# PDI
+axes[1].errorbar(
+    summary_pdi["fase_fisiologica"],
+    summary_pdi["media_pdi"],
+    yerr=summary_pdi["std_pdi"],
+    marker='s',
+    capsize=5,
+    linewidth=2,
+    color="tab:orange"
+)
+
+axes[1].set_ylabel("Índice de polidispersidad (PDI)")
+axes[1].set_xlabel("Fase fisiológica")
+axes[1].grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
