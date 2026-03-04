@@ -1,0 +1,13 @@
+﻿snedds ,sistema,fase,tiempo,tamaño_particula,indice_polidispersidad,ph,enzima,agitacion,temperatura
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Inicial ,Inicial ,0,22.85,0.122,7,ninguna ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Boca ,Boca ,0.166666667,29.36666667,0.303666667,7,mucina ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Estomago,Estomago,1,25.58,0.140666667,7,pepsina ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Estomago - Intestino,Estomago,2,26.29333333,0.246,7,pepsina ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (15 min) ,Intestino ,135,26.80666667,0.140333333,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (30 min ),Intestino ,2.5,26.80666667,0.143666667,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (45 min) ,Intestino ,2.75,33.41,0.111,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (60 min) ,Intestino ,3,26.46333333,0.179333333,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (75 min) ,Intestino ,3.25,30.78666667,0.134333333,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (90 min),Intestino ,3.5,32.27333333,0.134333333,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (105 min) ,Intestino ,3.75,26.00666667,0.150333333,7,Lipasa pancreatica ,100,37
+"Trigliceridos de cadena media, Tween 80, Cremophor, Polietilenglicol ",Intestino (120 min) ,Intestino ,4,37.28666667,0.152333333,7,Lipasa pancreatica ,100,37
