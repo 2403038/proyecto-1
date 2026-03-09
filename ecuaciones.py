@@ -267,3 +267,96 @@ plt.show()
 
 
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# =========================
+# 1. CARGAR EXCEL
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+# =========================
+# 2. LIMPIAR NOMBRES
+# =========================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace(" ", "_")
+)
+
+print("Columnas detectadas:")
+print(df.columns)
+
+# =========================
+# 3. DEFINIR COLUMNAS
+# =========================
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+# =========================
+# 4. FILTRAR SOLO INTESTINO
+# =========================
+
+df_int = df[
+    df[col_fase].str.contains("Intestino", case=False, na=False)
+].copy()
+
+# convertir a número
+df_int[col_tamano] = pd.to_numeric(df_int[col_tamano], errors="coerce")
+df_int[col_tiempo] = pd.to_numeric(df_int[col_tiempo], errors="coerce")
+
+# eliminar vacíos
+df_int = df_int.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# 5. CALCULAR PROMEDIO Y DESVIACIÓN
+# =========================
+
+datos = (
+    df_int
+    .groupby(col_tiempo)[col_tamano]
+    .agg(['mean','std'])
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+print("\nPromedios y desviación estándar:")
+print(datos)
+
+# =========================
+# 6. VARIABLES PARA GRAFICA
+# =========================
+
+t = datos[col_tiempo]
+tam_prom = datos['mean']
+tam_std = datos['std']
+
+# =========================
+# 7. GRAFICA CON BARRAS DE ERROR
+# =========================
+
+plt.figure()
+
+plt.errorbar(
+    t,
+    tam_prom,
+    yerr=tam_std,
+    fmt='o-',
+    capsize=5,
+    label="Promedio ± desviación estándar"
+)
+
+plt.xlabel("Tiempo de digestión (min)")
+plt.ylabel("Tamaño de partícula (nm)")
+plt.title("Estabilidad del SNEDDS en fase intestinal")
+
+plt.grid(True)
+plt.legend()
+
+plt.show()
