@@ -360,3 +360,573 @@ plt.grid(True)
 plt.legend()
 
 plt.show()
+
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# =========================
+# 1. CARGAR EXCEL
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+# =========================
+# 2. LIMPIAR NOMBRES
+# =========================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace(" ", "_")
+)
+
+print("Columnas detectadas:")
+print(df.columns)
+
+# =========================
+# 3. DEFINIR COLUMNAS
+# =========================
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+# =========================
+# 4. FILTRAR FASE INTESTINAL
+# =========================
+
+df_int = df[
+    df[col_fase].str.contains("Intestino", case=False, na=False)
+].copy()
+
+df_int[col_tamano] = pd.to_numeric(df_int[col_tamano], errors="coerce")
+df_int[col_tiempo] = pd.to_numeric(df_int[col_tiempo], errors="coerce")
+
+df_int = df_int.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# 5. CALCULAR PROMEDIO Y DESVIACIÓN
+# =========================
+
+datos = (
+    df_int
+    .groupby(col_tiempo)[col_tamano]
+    .agg(['mean','std'])
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+print("\nPromedios y desviación estándar:")
+print(datos)
+
+# =========================
+# 6. VARIABLES
+# =========================
+
+t = datos[col_tiempo]
+tam_prom = datos['mean']
+tam_std = datos['std']
+
+# =========================
+# 7. CONFIGURACIÓN DE ESTILO
+# =========================
+
+plt.style.use("seaborn-v0_8-whitegrid")
+
+plt.figure(figsize=(7,5))
+
+# =========================
+# 8. GRAFICA
+# =========================
+
+plt.errorbar(
+    t,
+    tam_prom,
+    yerr=tam_std,
+    fmt='o',
+    color='navy',
+    ecolor='black',
+    capsize=4,
+    markersize=7,
+    label="Mean ± SD"
+)
+
+plt.plot(
+    t,
+    tam_prom,
+    color='navy',
+    linewidth=2
+)
+
+# =========================
+# 9. ETIQUETAS
+# =========================
+
+plt.xlabel("Tiempo de digestión (min)", fontsize=12)
+plt.ylabel("Tamaño de partícula (nm)", fontsize=12)
+
+plt.title("Estabilidad del SNEDDS durante digestión intestinal", fontsize=13)
+
+plt.xticks(fontsize=11)
+plt.yticks(fontsize=11)
+
+plt.legend()
+
+# =========================
+# 10. GUARDAR FIGURA
+# =========================
+
+plt.tight_layout()
+
+plt.savefig(
+    "grafica_digestión_intestinal.png",
+    dpi=300
+)
+
+plt.show()
+
+
+
+
+
+# =========================
+# 11. VELOCIDAD DE CAMBIO
+# =========================
+
+D = datos['mean'].values
+t = datos['Tiempo_min'].values
+
+velocidad = np.diff(D) / np.diff(t)
+
+tiempo_vel = (t[:-1] + t[1:]) / 2
+
+df_vel = pd.DataFrame({
+    "Tiempo_min": tiempo_vel,
+    "dD_dt (nm/min)": velocidad
+})
+
+print("\nVelocidad de cambio del tamaño:")
+print(df_vel)
+# =========================
+# 12. GRAFICA VELOCIDAD
+# =========================
+
+plt.figure(figsize=(7,5))
+
+plt.plot(
+    tiempo_vel,
+    velocidad,
+    marker='o',
+    linewidth=2
+)
+
+plt.axhline(0)
+
+plt.xlabel("Tiempo de digestión (min)")
+plt.ylabel("Velocidad de cambio (nm/min)")
+plt.title("Cinética de cambio del tamaño de partícula")
+
+plt.grid(True)
+
+plt.show()
+
+
+
+
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# =========================
+# CARGAR EXCEL
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+# =========================
+# LIMPIAR NOMBRES
+# =========================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace(" ", "_")
+)
+
+# =========================
+# DEFINIR COLUMNAS
+# =========================
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+# =========================
+# LIMPIAR DATOS
+# =========================
+
+df[col_tamano] = pd.to_numeric(df[col_tamano], errors="coerce")
+df[col_tiempo] = pd.to_numeric(df[col_tiempo], errors="coerce")
+
+df = df.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# PROMEDIO Y SD
+# =========================
+
+datos = (
+    df
+    .groupby([col_fase, col_tiempo])[col_tamano]
+    .agg(['mean','std'])
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+t = datos[col_tiempo].values
+tam_prom = datos['mean'].values
+tam_std = datos['std'].values
+
+# =========================
+# MODELO CIENTÍFICO
+# =========================
+
+def modelo(t,a,b,c):
+    return a*t**2 + b*t + c
+
+params,_ = curve_fit(modelo,t,tam_prom)
+
+a,b,c = params
+
+# predicción del modelo
+t_fit = np.linspace(min(t),max(t),300)
+tam_fit = modelo(t_fit,a,b,c)
+
+# =========================
+# CALCULO R2
+# =========================
+
+tam_pred = modelo(t,a,b,c)
+
+ss_res = np.sum((tam_prom - tam_pred)**2)
+ss_tot = np.sum((tam_prom - np.mean(tam_prom))**2)
+
+r2 = 1 - ss_res/ss_tot
+
+print("\nModelo cinético:")
+print("a =",a)
+print("b =",b)
+print("c =",c)
+print("R2 =",r2)
+
+# =========================
+# GRAFICA PROFESIONAL
+# =========================
+
+plt.figure(figsize=(9,5))
+
+# zonas digestivas
+plt.axvspan(0,5,color="#FFF3B0",alpha=0.6,label="Boca")
+plt.axvspan(5,120,color="#FFB3B3",alpha=0.4,label="Estómago")
+plt.axvspan(120,240,color="#B7E4C7",alpha=0.4,label="Intestino")
+
+# datos experimentales
+plt.errorbar(
+    t,
+    tam_prom,
+    yerr=tam_std,
+    fmt='o',
+    color="#1f77b4",
+    ecolor="black",
+    capsize=4,
+    markersize=7,
+    label="Datos experimentales ± SD"
+)
+
+# linea de datos
+plt.plot(
+    t,
+    tam_prom,
+    color="#1f77b4",
+    linewidth=1.5
+)
+
+# modelo cinético
+plt.plot(
+    t_fit,
+    tam_fit,
+    color="black",
+    linestyle="--",
+    linewidth=2,
+    label=f"Modelo cinético (R² = {r2:.3f})"
+)
+
+# etiquetas
+plt.xlabel("Tiempo de digestión (min)",fontsize=12)
+plt.ylabel("Tamaño de partícula (nm)",fontsize=12)
+
+plt.title(
+"Evolución del tamaño de partícula del SNEDDS durante digestión gastrointestinal",
+fontsize=13
+)
+
+plt.grid(alpha=0.3)
+
+plt.legend()
+
+plt.tight_layout()
+
+# guardar figura
+plt.savefig(
+"grafica_SNEDDS_digestión_modelo.png",
+dpi=600
+)
+
+plt.show()
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# =========================
+# CARGAR DATOS
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+df.columns = df.columns.str.strip().str.replace(" ", "_")
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+df[col_tamano] = pd.to_numeric(df[col_tamano], errors="coerce")
+df[col_tiempo] = pd.to_numeric(df[col_tiempo], errors="coerce")
+
+df = df.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# PROMEDIO Y SD
+# =========================
+
+datos = (
+    df.groupby([col_fase, col_tiempo])[col_tamano]
+    .agg(['mean','std'])
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+t = datos[col_tiempo].values
+tam_prom = datos['mean'].values
+tam_std = datos['std'].values
+
+# =========================
+# MODELO
+# =========================
+
+def modelo(t,a,b,c):
+    return a*t**2 + b*t + c
+
+params,_ = curve_fit(modelo,t,tam_prom)
+
+a,b,c = params
+
+t_fit = np.linspace(min(t),max(t),300)
+tam_fit = modelo(t_fit,a,b,c)
+
+# R2
+tam_pred = modelo(t,a,b,c)
+
+ss_res = np.sum((tam_prom - tam_pred)**2)
+ss_tot = np.sum((tam_prom - np.mean(tam_prom))**2)
+
+r2 = 1 - ss_res/ss_tot
+
+# =========================
+# VELOCIDAD dD/dt
+# =========================
+
+vel = np.diff(tam_prom)/np.diff(t)
+t_vel = (t[:-1] + t[1:])/2
+
+# =========================
+# FIGURA DOS PANELES
+# =========================
+
+fig,ax = plt.subplots(2,1,figsize=(9,8))
+
+# PANEL A
+ax[0].axvspan(0,5,color="#FFF3B0",alpha=0.6)
+ax[0].axvspan(5,120,color="#FFB3B3",alpha=0.4)
+ax[0].axvspan(120,240,color="#B7E4C7",alpha=0.4)
+
+ax[0].errorbar(t,tam_prom,yerr=tam_std,fmt='o',capsize=4,label="Datos ± SD")
+
+ax[0].plot(t,tam_prom)
+
+ax[0].plot(t_fit,tam_fit,'--',label=f"Modelo (R²={r2:.3f})")
+
+ax[0].set_ylabel("Tamaño de partícula (nm)")
+ax[0].set_title("A) Evolución del tamaño de partícula")
+
+ax[0].legend()
+ax[0].grid(alpha=0.3)
+
+# PANEL B
+
+ax[1].plot(t_vel,vel,'o-',color="black")
+
+ax[1].axhline(0)
+
+ax[1].set_xlabel("Tiempo de digestión (min)")
+ax[1].set_ylabel("dD/dt (nm/min)")
+ax[1].set_title("B) Velocidad de cambio del tamaño")
+
+ax[1].grid(alpha=0.3)
+
+plt.tight_layout()
+
+plt.savefig("figura_SNEDDS_cinetica.png",dpi=600)
+
+plt.show()
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# =========================
+# CARGAR DATOS
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+df.columns = df.columns.str.strip().str.replace(" ", "_")
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+df[col_tamano] = pd.to_numeric(df[col_tamano], errors="coerce")
+df[col_tiempo] = pd.to_numeric(df[col_tiempo], errors="coerce")
+
+df = df.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# PROMEDIOS
+# =========================
+
+datos = (
+    df.groupby([col_fase, col_tiempo])[col_tamano]
+    .agg(['mean','std'])
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+t = datos[col_tiempo].values
+tam_prom = datos['mean'].values
+tam_std = datos['std'].values
+
+# =========================
+# MODELO EXPONENCIAL
+# =========================
+
+def modelo_exp(t,Dinf,D0,k):
+    return Dinf + (D0 - Dinf)*np.exp(-k*t)
+
+p0 = [26,25,0.01]
+
+params,_ = curve_fit(modelo_exp,t,tam_prom,p0=p0,maxfev=10000)
+
+Dinf,D0,k = params
+
+t_fit = np.linspace(min(t),max(t),300)
+
+tam_fit = modelo_exp(t_fit,Dinf,D0,k)
+
+# =========================
+# R2
+# =========================
+
+tam_pred = modelo_exp(t,Dinf,D0,k)
+
+ss_res = np.sum((tam_prom - tam_pred)**2)
+ss_tot = np.sum((tam_prom - np.mean(tam_prom))**2)
+
+r2 = 1 - ss_res/ss_tot
+
+print("\nModelo exponencial")
+print("D∞ =",Dinf)
+print("D0 =",D0)
+print("k =",k)
+print("R2 =",r2)
+
+# =========================
+# VELOCIDAD
+# =========================
+
+vel = np.diff(tam_prom)/np.diff(t)
+t_vel = (t[:-1] + t[1:])/2
+
+# =========================
+# FIGURA DOS PANELES
+# =========================
+
+fig,ax = plt.subplots(2,1,figsize=(9,8))
+
+# PANEL A
+ax[0].axvspan(0,5,color="#FFF3B0",alpha=0.6,label="Boca")
+ax[0].axvspan(5,120,color="#FFB3B3",alpha=0.4,label="Estómago")
+ax[0].axvspan(120,240,color="#B7E4C7",alpha=0.4,label="Intestino")
+
+ax[0].errorbar(t,tam_prom,yerr=tam_std,fmt='o',capsize=4,label="Datos ± SD")
+
+ax[0].plot(t,tam_prom)
+
+ax[0].plot(t_fit,tam_fit,'--',linewidth=2,label=f"Modelo exponencial (R²={r2:.3f})")
+
+ax[0].set_ylabel("Tamaño de partícula (nm)")
+ax[0].set_title("A) Evolución del tamaño de partícula del SNEDDS")
+
+ax[0].legend()
+ax[0].grid(alpha=0.3)
+
+# PANEL B
+ax[1].plot(t_vel,vel,'o-',color="black")
+
+ax[1].axhline(0)
+
+ax[1].set_xlabel("Tiempo de digestión (min)")
+ax[1].set_ylabel("dD/dt (nm/min)")
+ax[1].set_title("B) Velocidad de cambio")
+
+ax[1].grid(alpha=0.3)
+
+plt.tight_layout()
+
+plt.savefig("SNEDDS_modelo_exponencial.png",dpi=600)
+
+plt.show()
