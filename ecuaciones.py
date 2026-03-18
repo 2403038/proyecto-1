@@ -930,3 +930,140 @@ plt.tight_layout()
 plt.savefig("SNEDDS_modelo_exponencial.png",dpi=600)
 
 plt.show()
+
+
+
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# =========================
+# CARGAR DATOS
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx")
+
+df.columns = df.columns.str.strip().str.replace(" ", "_")
+
+col_fase = "Fase"
+col_tamano = "Tamaño_de_particula"
+col_tiempo = "Tiempo_min"
+
+df[col_tamano] = pd.to_numeric(df[col_tamano], errors="coerce")
+df[col_tiempo] = pd.to_numeric(df[col_tiempo], errors="coerce")
+
+df = df.dropna(subset=[col_tamano, col_tiempo])
+
+# =========================
+# PROMEDIO
+# =========================
+
+datos = (
+    df.groupby([col_fase, col_tiempo])[col_tamano]
+    .mean()
+    .reset_index()
+)
+
+datos = datos.sort_values(col_tiempo)
+
+t = datos[col_tiempo].values
+D = datos['Tamaño_de_particula'].values
+
+# =========================
+# FUNCION R2
+# =========================
+
+def calc_r2(y, y_pred):
+    ss_res = np.sum((y - y_pred)**2)
+    ss_tot = np.sum((y - np.mean(y))**2)
+    return 1 - ss_res/ss_tot
+
+# =========================
+# 1. MODELO EXPONENCIAL
+# =========================
+
+def modelo_exp(t, Dinf, D0, k):
+    return Dinf + (D0 - Dinf)*np.exp(-k*t)
+
+p0_exp = [D[-1], D[0], 0.01]
+par_exp,_ = curve_fit(modelo_exp, t, D, p0=p0_exp, maxfev=10000)
+
+D_exp = modelo_exp(t, *par_exp)
+r2_exp = calc_r2(D, D_exp)
+
+# =========================
+# 2. MODELO LOGÍSTICO
+# =========================
+
+def modelo_log(t, Dmax, k, t0):
+    return Dmax / (1 + np.exp(-k*(t - t0)))
+
+p0_log = [max(D), 0.01, np.mean(t)]
+par_log,_ = curve_fit(modelo_log, t, D, p0=p0_log, maxfev=10000)
+
+D_log = modelo_log(t, *par_log)
+r2_log = calc_r2(D, D_log)
+
+# =========================
+# 3. POLINOMIAL 2° ORDEN
+# =========================
+
+coef_poly = np.polyfit(t, D, 2)
+D_poly = np.polyval(coef_poly, t)
+r2_poly = calc_r2(D, D_poly)
+
+# =========================
+# 4. MODELO LINEAL
+# =========================
+
+coef_lin = np.polyfit(t, D, 1)
+D_lin = np.polyval(coef_lin, t)
+r2_lin = calc_r2(D, D_lin)
+
+# =========================
+# RESULTADOS
+# =========================
+
+print("\n=== R² DE LOS MODELOS ===")
+print("Exponencial:", r2_exp)
+print("Logístico:", r2_log)
+print("Polinomial:", r2_poly)
+print("Lineal:", r2_lin)
+
+# =========================
+# CURVAS SUAVES
+# =========================
+
+t_fit = np.linspace(min(t), max(t), 300)
+
+plt.figure(figsize=(9,6))
+
+# datos experimentales
+plt.scatter(t, D, color="black", label="Datos")
+
+# curvas
+plt.plot(t_fit, modelo_exp(t_fit, *par_exp),
+         label=f"Exponencial (R²={r2_exp:.3f})")
+
+plt.plot(t_fit, modelo_log(t_fit, *par_log),
+         label=f"Logístico (R²={r2_log:.3f})")
+
+plt.plot(t_fit, np.polyval(coef_poly, t_fit),
+         label=f"Polinomial (R²={r2_poly:.3f})")
+
+plt.plot(t_fit, np.polyval(coef_lin, t_fit),
+         label=f"Lineal (R²={r2_lin:.3f})")
+
+plt.xlabel("Tiempo (min)")
+plt.ylabel("Tamaño de partícula (nm)")
+plt.title("Comparación de modelos cinéticos")
+
+plt.legend()
+plt.grid(True)
+
+plt.show()
