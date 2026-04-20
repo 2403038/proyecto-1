@@ -73,6 +73,16 @@ stats = (
 print("\nEstadísticos:")
 print(stats)
 
+# 🔹 Línea de tendencia experimental (VERDE)
+plt.plot(
+    stats["tiempo_min"],
+    stats["mean"],
+    linestyle="--",
+    color="green",
+    linewidth=2,
+    label="Tendencia experimental"
+)
+
 # =========================
 # 6. MODELO DE ADSORCIÓN
 # =========================
@@ -122,14 +132,17 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import pandas as pd
 
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
 # =========================
 # 1. CARGAR EXCEL
 # =========================
 
 df = pd.read_excel("Datos generales digestion.xlsx", sheet_name="Hoja1")
-
-print("Columnas originales:")
-print(df.columns.tolist())
 
 # =========================
 # 2. NORMALIZAR COLUMNAS
@@ -150,8 +163,131 @@ df.columns = (
     .str.replace("ú", "u")
 )
 
-print("\nColumnas normalizadas:")
-print(df.columns.tolist())
+# =========================
+# 3. DETECTAR COLUMNAS
+# =========================
+
+col_fase = [c for c in df.columns if "fase" in c.lower()][0]
+col_tiempo = [c for c in df.columns if "tiempo" in c.lower()][0]
+col_tamano = [c for c in df.columns if "particula" in c.lower()][0]
+
+# =========================
+# 4. FILTRAR ESTOMAGO
+# =========================
+
+df_est = df[df[col_fase].astype(str).str.contains("estomago", case=False)].copy()
+
+df_est[col_tiempo] = pd.to_numeric(df_est[col_tiempo], errors="coerce")
+df_est[col_tamano] = pd.to_numeric(df_est[col_tamano], errors="coerce")
+
+df_est = df_est.dropna(subset=[col_tiempo, col_tamano])
+
+# =========================
+# 5. MEDIA + DESVIACIÓN
+# =========================
+
+stats = (
+    df_est
+    .groupby(col_tiempo)[col_tamano]
+    .agg(["mean", "std"])
+    .reset_index()
+)
+
+stats = stats.sort_values(col_tiempo)
+
+t_est = stats[col_tiempo].values
+D_est = stats["mean"].values
+std_est = stats["std"].values
+
+# =========================
+# 6. TRANSICIÓN
+# =========================
+
+t0 = 10
+D0 = 29.36
+
+t_est = np.insert(t_est, 0, t0)
+D_est = np.insert(D_est, 0, D0)
+std_est = np.insert(std_est, 0, 0)  # sin error en transición
+
+# =========================
+# 7. MODELO
+# =========================
+
+def modelo_estomago(t, D_eq, k):
+    return D_eq + (D0 - D_eq) * np.exp(-k * (t - t0))
+
+params, _ = curve_fit(modelo_estomago, t_est, D_est, p0=[D_est[-1], 0.01])
+
+D_eq, k = params
+
+# =========================
+# 8. GRAFICA
+# =========================
+
+t_fit = np.linspace(min(t_est), max(t_est), 200)
+D_fit = modelo_estomago(t_fit, D_eq, k)
+
+plt.figure()
+
+# 🔥 BARRAS DE ERROR (LO QUE TE FALTABA)
+plt.errorbar(
+    t_est,
+    D_est,
+    yerr=std_est,
+    fmt='o',
+    capsize=5,
+    label="Datos experimentales"
+)
+
+# tendencia experimental
+plt.plot(t_est, D_est, linestyle="--", color="green", label="Tendencia experimental")
+
+# modelo
+plt.plot(t_fit, D_fit, color="orange", linewidth=2, label="Modelo")
+
+plt.axvline(x=10, linestyle="--", alpha=0.5)
+
+plt.xlabel("Tiempo (min)")
+plt.ylabel("Tamaño (nm)")
+plt.title("Fase Estómago con barras de error")
+plt.legend()
+
+plt.show()
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# =========================
+# 1. CARGAR EXCEL
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx", sheet_name="Hoja1")
+
+# =========================
+# 2. NORMALIZAR COLUMNAS
+# =========================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace(" ", "_")
+    .str.replace("°", "")
+    .str.replace("(", "")
+    .str.replace(")", "")
+    .str.replace("ñ", "n")
+    .str.replace("á", "a")
+    .str.replace("é", "e")
+    .str.replace("í", "i")
+    .str.replace("ó", "o")
+    .str.replace("ú", "u")
+)
+
+print("Columnas detectadas:", df.columns)
 
 # =========================
 # 3. DETECTAR COLUMNAS
@@ -161,111 +297,144 @@ col_fase = [c for c in df.columns if "fase" in c.lower()][0]
 col_tiempo = [c for c in df.columns if "tiempo" in c.lower()][0]
 col_tamano = [c for c in df.columns if "particula" in c.lower()][0]
 
-print("\nColumnas detectadas:")
-print("Fase:", col_fase)
-print("Tiempo:", col_tiempo)
-print("Tamaño:", col_tamano)
-
 # =========================
-# 4. FILTRAR ESTOMAGO + TRANSICION
+# 4. FILTRAR INTESTINO
 # =========================
 
-df_est = df[
+df_int = df[
     df[col_fase]
     .astype(str)
-    .str.contains("estomago", case=False, na=False)
+    .str.contains("intestino", case=False, na=False)
 ].copy()
 
-if df_est.empty:
-    raise ValueError("❌ No se encontraron datos de Estómago.")
+if df_int.empty:
+    raise ValueError("❌ No se encontraron datos de intestino")
 
-# convertir tiempo a numero
-df_est[col_tiempo] = pd.to_numeric(df_est[col_tiempo], errors="coerce")
+# convertir a numérico
+df_int[col_tiempo] = pd.to_numeric(df_int[col_tiempo], errors="coerce")
+df_int[col_tamano] = pd.to_numeric(df_int[col_tamano], errors="coerce")
 
-# eliminar NaN
-df_est = df_est.dropna(subset=[col_tiempo, col_tamano])
+df_int = df_int.dropna(subset=[col_tiempo, col_tamano])
 
 # =========================
-# 5. PROMEDIAR REPLICADOS
+# 5. MEDIA + DESVIACIÓN
 # =========================
 
-df_est = (
-    df_est
+stats = (
+    df_int
     .groupby(col_tiempo)[col_tamano]
-    .mean()
+    .agg(["mean", "std"])
     .reset_index()
 )
 
-df_est = df_est.sort_values(col_tiempo)
+stats = stats.sort_values(col_tiempo)
 
-t_est = df_est[col_tiempo].values.astype(float)
-D_est = df_est[col_tamano].values.astype(float)
+t_int = stats[col_tiempo].values.astype(float)
+D_int = stats["mean"].values.astype(float)
+std_int = stats["std"].values.astype(float)
 
-print("\nTiempos estomago:", t_est)
-print("Tamaño promedio:", D_est)
+print("\nTiempos intestino:", t_int)
+print("Tamaño promedio:", D_int)
+print("Desviación estándar:", std_int)
 
 # =========================
-# 6. MODELO EXPONENCIAL
+# 6. AGREGAR TRANSICIÓN
 # =========================
 
-def modelo_estomago(t, D_eq, k):
-    D0 = D_est[0]
-    return D_eq + (D0 - D_eq) * np.exp(-k * t)
+t0 = 120
+D0 = 25.29  # último valor experimental de estómago
 
-p0 = [D_est[-1], 0.001]
+t_int = np.insert(t_int, 0, t0)
+D_int = np.insert(D_int, 0, D0)
+std_int = np.insert(std_int, 0, 0)  # sin error en transición
 
-params_est, _ = curve_fit(
-    modelo_estomago,
-    t_est,
-    D_est,
+print("\nDatos con transición:")
+print("t:", t_int)
+print("D:", D_int)
+
+# =========================
+# 7. MODELO
+# =========================
+
+def modelo_intestino(t, D_eq, k):
+    return D_eq + (D0 - D_eq) * np.exp(-k * (t - t0))
+
+p0 = [min(D_int), 0.01]
+
+params_int, _ = curve_fit(
+    modelo_intestino,
+    t_int,
+    D_int,
     p0=p0,
     maxfev=10000
 )
 
-D_eq_est, k_est = params_est
+D_eq_int, k_int = params_int
 
-print("\nRESULTADOS ESTOMAGO")
-print("D_eq =", D_eq_est)
-print("k =", k_est)
+print("\nRESULTADOS INTESTINO")
+print("D_eq =", D_eq_int)
+print("k =", k_int)
 
 # =========================
-# 7. R²
+# 8. R²
 # =========================
 
-D_pred = modelo_estomago(t_est, D_eq_est, k_est)
+D_pred = modelo_intestino(t_int, D_eq_int, k_int)
 
-ss_res = np.sum((D_est - D_pred) ** 2)
-ss_tot = np.sum((D_est - np.mean(D_est)) ** 2)
+ss_res = np.sum((D_int - D_pred) ** 2)
+ss_tot = np.sum((D_int - np.mean(D_int)) ** 2)
 
 r2 = 1 - (ss_res / ss_tot)
 
 print("R² =", r2)
 
 # =========================
-# 8. GRAFICA
+# 9. GRAFICA
 # =========================
 
-t_fit = np.linspace(min(t_est), max(t_est), 200)
-D_fit = modelo_estomago(t_fit, D_eq_est, k_est)
+t_fit = np.linspace(min(t_int), max(t_int), 200)
+D_fit = modelo_intestino(t_fit, D_eq_int, k_int)
 
 plt.figure()
 
-plt.scatter(t_est, D_est, label="Datos experimentales")
+# 🔥 BARRAS DE ERROR (CLAVE)
+plt.errorbar(
+    t_int,
+    D_int,
+    yerr=std_int,
+    fmt='o',
+    capsize=5,
+    label="Datos experimentales"
+)
 
-plt.plot(t_est, D_est, linestyle="--", alpha=0.6)
+# tendencia experimental
+plt.plot(
+    t_int,
+    D_int,
+    linestyle="--",
+    color="green",
+    alpha=0.7,
+    label="Tendencia experimental"
+)
 
-plt.plot(t_fit, D_fit, linewidth=2, label="Modelo exponencial")
+# modelo
+plt.plot(
+    t_fit,
+    D_fit,
+    color="orange",
+    linewidth=2,
+    label="Modelo exponencial"
+)
+
+# transición
+plt.axvline(x=120, linestyle="--", alpha=0.5, label="Entrada al intestino")
 
 plt.xlabel("Tiempo (min)")
 plt.ylabel("Tamaño de partícula (nm)")
-plt.title("Cinética en fase Estómago (incluye transición)")
+plt.title("Cinética en fase intestinal del SNEDDS")
 plt.legend()
 
 plt.show()
-
-
-
-
 
 import numpy as np
 import pandas as pd
@@ -538,7 +707,138 @@ plt.grid(True)
 
 plt.show()
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
+# =========================
+# 1. CARGAR DATOS
+# =========================
+
+df = pd.read_excel("Datos generales digestion.xlsx", sheet_name="Hoja1")
+
+# =========================
+# 2. NORMALIZAR COLUMNAS
+# =========================
+
+df.columns = (
+    df.columns
+    .str.strip()
+    .str.replace(" ", "_")
+    .str.replace("ñ", "n")
+    .str.replace("á", "a")
+    .str.replace("é", "e")
+    .str.replace("í", "i")
+    .str.replace("ó", "o")
+    .str.replace("ú", "u")
+)
+
+# =========================
+# 3. DETECTAR COLUMNAS
+# =========================
+
+col_fase = [c for c in df.columns if "fase" in c.lower()][0]
+col_tiempo = [c for c in df.columns if "tiempo" in c.lower()][0]
+col_tamano = [c for c in df.columns if "particula" in c.lower()][0]
+
+# convertir a numérico
+df[col_tiempo] = pd.to_numeric(df[col_tiempo], errors="coerce")
+df[col_tamano] = pd.to_numeric(df[col_tamano], errors="coerce")
+
+df = df.dropna(subset=[col_tiempo, col_tamano])
+
+# =========================
+# 4. FUNCIÓN PARA ANALIZAR FASE
+# =========================
+
+def analizar_fase(nombre_fase):
+
+    df_fase = df[
+        df[col_fase]
+        .astype(str)
+        .str.contains(nombre_fase, case=False, na=False)
+    ].copy()
+
+    if df_fase.empty:
+        print(f"❌ No hay datos para {nombre_fase}")
+        return
+
+    # promedio y std
+    stats = (
+        df_fase
+        .groupby(col_tiempo)[col_tamano]
+        .agg(["mean", "std"])
+        .reset_index()
+        .sort_values(col_tiempo)
+    )
+
+    t = stats[col_tiempo].values
+    D = stats["mean"].values
+    std = stats["std"].values
+
+    # =========================
+    # VELOCIDAD
+    # =========================
+
+    velocidad = np.diff(D) / np.diff(t)
+    tiempo_vel = (t[:-1] + t[1:]) / 2
+
+    print(f"\n📊 Fase: {nombre_fase}")
+    print(pd.DataFrame({
+        "Tiempo (min)": tiempo_vel,
+        "dD/dt (nm/min)": velocidad
+    }))
+
+    # =========================
+    # GRAFICA
+    # =========================
+
+    plt.figure()
+
+    # barras de error
+    plt.errorbar(
+        t,
+        D,
+        yerr=std,
+        fmt='o',
+        capsize=5,
+        label="Datos experimentales"
+    )
+
+    # tendencia
+    plt.plot(
+        t,
+        D,
+        linestyle="--",
+        color="green",
+        label="Tendencia experimental"
+    )
+
+    # velocidad
+    plt.plot(
+        tiempo_vel,
+        velocidad,
+        marker='o',
+        linestyle='-',
+        label="dD/dt"
+    )
+
+    plt.axhline(0, linestyle="--", alpha=0.5)
+
+    plt.xlabel("Tiempo (min)")
+    plt.ylabel("Tamaño / Velocidad")
+    plt.title(f"Cinética en fase {nombre_fase}")
+    plt.legend()
+
+    plt.show()
+
+# =========================
+# 5. ANALIZAR CADA FASE
+# =========================
+
+analizar_fase("boca")
+analizar_fase("estomago")
+analizar_fase("intestino")
 
 
 

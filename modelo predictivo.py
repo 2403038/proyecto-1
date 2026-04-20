@@ -545,3 +545,508 @@ ax.set_xticklabels(labels)
 
 plt.title("Perfil integral del SNEDDS")
 plt.show()
+
+
+
+# ============================================================
+# 🧠 MODELO INTEGRAL SNEDDS PEGILADO
+# Distribución sistémica + dinámica intracelular
+# ============================================================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+
+print("\n================ DISTRIBUCIÓN SISTÉMICA (PEG) =================")
+
+# ============================================================
+# 🩸 PARTE 1 — DISTRIBUCIÓN SISTÉMICA
+# Plasma → Tejido → Intracelular
+# ============================================================
+
+# Parámetros (PEG stealth)
+
+Fa = 0.54      # fracción absorbida desde intestino
+Ka = 1.0       # absorción al plasma
+
+Ke = 0.25      # eliminación plasmática
+
+Kpt = 0.6      # plasma → tejido
+Ktp = 0.4      # tejido → plasma
+
+Ktc = 0.3      # tejido → célula
+Kct = 0.2      # célula → tejido
+
+Kdeg = 0.1     # degradación intracelular
+
+
+# -------------------------
+# MODELO SISTÉMICO
+# -------------------------
+
+def modelo_sistemico(y, t):
+    Cp, Ct, Cc = y
+    
+    dCp = Ka*Fa - Ke*Cp - Kpt*Cp + Ktp*Ct
+    dCt = Kpt*Cp - Ktp*Ct - Ktc*Ct + Kct*Cc
+    dCc = Ktc*Ct - Kct*Cc - Kdeg*Cc
+    
+    return [dCp, dCt, dCc]
+
+
+# -------------------------
+# SIMULACIÓN
+# -------------------------
+
+y0_sys = [0, 0, 0]
+t = np.linspace(0, 24, 200)
+
+sol_sys = odeint(modelo_sistemico, y0_sys, t)
+
+Cp = sol_sys[:, 0]
+Ct = sol_sys[:, 1]
+Cc = sol_sys[:, 2]
+
+
+# -------------------------
+# GRÁFICA SISTÉMICA
+# -------------------------
+
+plt.figure(figsize=(8, 5))
+plt.plot(t, Cp, label="Plasma")
+plt.plot(t, Ct, label="Tejido")
+plt.plot(t, Cc, label="Intracelular")
+
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Concentración relativa")
+plt.title("Distribución sistémica del SNEDDS PEGilado")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# -------------------------
+# MÉTRICAS SISTÉMICAS
+# -------------------------
+
+print(f"Cmax plasmática = {Cp.max():.3f}")
+print(f"Cmax intracelular = {Cc.max():.3f}")
+print(f"Tmax celular ≈ {t[np.argmax(Cc)]:.2f} h")
+
+
+# ============================================================
+# 🧬 PARTE 2 — DINÁMICA INTRACELULAR
+# SNEDDS → Fármaco libre → Metabolizado
+# ============================================================
+
+print("\n================ DINÁMICA INTRACELULAR =================")
+
+Cext = Cc.max()   # concentración extracelular
+
+Kin = 0.6         # endocitosis
+Kdis = 0.5        # desintegración SNEDDS
+Kexo = 0.1        # exocitosis
+
+Kmet = 0.3        # metabolismo
+Kefflux = 0.2     # salida del fármaco
+
+
+# -------------------------
+# MODELO INTRACELULAR
+# -------------------------
+
+def modelo_intracelular(y, t):
+    N, D, M = y
+    
+    dN = Kin*Cext - Kdis*N - Kexo*N
+    dD = Kdis*N - Kmet*D - Kefflux*D
+    dM = Kmet*D
+    
+    return [dN, dD, dM]
+
+
+# -------------------------
+# SIMULACIÓN
+# -------------------------
+
+y0_cell = [0, 0, 0]
+
+sol_cell = odeint(modelo_intracelular, y0_cell, t)
+
+N = sol_cell[:, 0]
+D = sol_cell[:, 1]
+M = sol_cell[:, 2]
+
+
+# -------------------------
+# GRÁFICA INTRACELULAR
+# -------------------------
+
+plt.figure(figsize=(8, 5))
+plt.plot(t, N, label="SNEDDS intracelular")
+plt.plot(t, D, label="Fármaco libre")
+plt.plot(t, M, label="Metabolizado")
+
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Cantidad relativa")
+plt.title("Destino intracelular del SNEDDS PEGilado")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# -------------------------
+# MÉTRICAS INTRACELULARES
+# -------------------------
+
+print(f"Máximo SNEDDS intracelular = {N.max():.3f}")
+print(f"Máxima concentración fármaco libre = {D.max():.3f}")
+print(f"Tiempo a máximo fármaco ≈ {t[np.argmax(D)]:.2f} h")
+
+# ============================================================
+# 🧬 ACUMULACIÓN TUMORAL POR EFECTO EPR — SNEDDS PEGILADO
+# ============================================================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+print("\n================ ACUMULACIÓN TUMORAL (EPR) =================")
+
+# ============================================================
+# PARÁMETROS
+# ============================================================
+
+Fa = 0.54
+Ka = 1.0
+
+Ke = 0.20        # eliminación lenta por PEG
+
+Kpt = 0.5        # plasma → tejido normal
+Ktp = 0.4        # retorno
+
+# ---- EPR ----
+
+Ktum = 0.8       # extravasación plasma → tumor (alta)
+Kret = 0.1       # retorno tumor → plasma (bajo)
+
+# ---- Entrada celular tumoral ----
+
+Ktc = 0.5        # tumor → célula tumoral
+Kct = 0.1        # salida
+
+Kdeg = 0.15      # degradación intracelular
+
+
+# ============================================================
+# MODELO EPR
+# Compartimentos:
+# Plasma (Cp)
+# Tejido normal (Ct)
+# Tumor (Cu)
+# Intracelular tumoral (Cc)
+# ============================================================
+
+def modelo_epr(y, t):
+    Cp, Ct, Cu, Cc = y
+
+    dCp = Ka*Fa - Ke*Cp - Kpt*Cp + Ktp*Ct - Ktum*Cp + Kret*Cu
+    dCt = Kpt*Cp - Ktp*Ct
+    dCu = Ktum*Cp - Kret*Cu - Ktc*Cu + Kct*Cc
+    dCc = Ktc*Cu - Kct*Cc - Kdeg*Cc
+
+    return [dCp, dCt, dCu, dCc]
+
+
+# ============================================================
+# SIMULACIÓN
+# ============================================================
+
+y0 = [0, 0, 0, 0]
+t = np.linspace(0, 72, 300)   # tumores acumulan lento
+
+sol = odeint(modelo_epr, y0, t)
+
+Cp = sol[:, 0]
+Ct = sol[:, 1]
+Cu = sol[:, 2]
+Cc = sol[:, 3]
+
+
+# ============================================================
+# GRÁFICA
+# ============================================================
+
+plt.figure(figsize=(9, 5))
+
+plt.plot(t, Cp, label="Plasma")
+plt.plot(t, Ct, label="Tejido normal")
+plt.plot(t, Cu, label="Tumor (EPR)")
+plt.plot(t, Cc, label="Intracelular tumoral")
+
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Concentración relativa")
+plt.title("Acumulación tumoral por efecto EPR — SNEDDS PEGilado")
+
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ============================================================
+# MÉTRICAS
+# ============================================================
+
+print(f"Cmax tumoral = {Cu.max():.3f}")
+print(f"Cmax intracelular tumoral = {Cc.max():.3f}")
+print(f"Tmax tumoral ≈ {t[np.argmax(Cu)]:.2f} h")
+print(f"Tmax intracelular ≈ {t[np.argmax(Cc)]:.2f} h")
+
+
+
+
+
+# ============================================================
+# 🧠 MODELO INTEGRAL SNEDDS–CPT ORAL
+# Boca → Estómago → Intestino → Plasma → Tumor → Célula → CPT
+# ============================================================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+print("\n================ MODELO ORAL SNEDDS–CPT =================")
+
+# ============================================================
+# PARÁMETROS GLOBALES
+# ============================================================
+
+# ---- Digestión ----
+K_boca = 0.05
+K_est = 0.15
+K_int = 0.30   # lipólisis intestinal
+
+# ---- Absorción ----
+Ka = 0.8
+Fa = 0.54
+
+# ---- Plasma ----
+Ke = 0.20      # eliminación PEG
+Kpt = 0.4
+Ktp = 0.3
+
+# ---- EPR tumoral ----
+Ktum = 0.7
+Kret = 0.1
+
+# ---- Entrada celular ----
+Ktc = 0.5
+Kct = 0.1
+
+# ---- Desintegración SNEDDS ----
+Kdis = 0.6
+
+# ---- CPT libre ----
+Kmet = 0.3
+Kefflux = 0.2
+
+
+# ============================================================
+# MODELO GLOBAL
+# Compartimentos:
+# N0 = nanoemulsión oral
+# B  = boca
+# S  = estómago
+# I  = intestino
+# Cp = plasma
+# Ct = tejido normal
+# Cu = tumor
+# Cn = SNEDDS intracelular tumoral
+# Cd = CPT libre intracelular
+# ============================================================
+
+def modelo(y, t):
+    N0, B, S, I, Cp, Ct, Cu, Cn, Cd = y
+
+    # Digestión oral
+    dN0 = -K_boca * N0
+    dB  = K_boca*N0 - K_est*B
+
+    # Estómago
+    dS = K_est*B - K_int*S
+
+    # Intestino
+    dI = K_int*S - Ka*Fa*I
+
+    # Plasma
+    dCp = Ka*Fa*I - Ke*Cp - Kpt*Cp + Ktp*Ct - Ktum*Cp + Kret*Cu
+
+    # Tejido normal
+    dCt = Kpt*Cp - Ktp*Ct
+
+    # Tumor (EPR)
+    dCu = Ktum*Cp - Kret*Cu - Ktc*Cu + Kct*Cn
+
+    # SNEDDS intracelular tumoral
+    dCn = Ktc*Cu - Kct*Cn - Kdis*Cn
+
+    # CPT libre intracelular
+    dCd = Kdis*Cn - Kmet*Cd - Kefflux*Cd
+
+    return [dN0, B, S, I, Cp, Ct, Cu, Cn, Cd]
+
+
+# ============================================================
+# SIMULACIÓN
+# ============================================================
+
+y0 = [1,0,0,0,0,0,0,0,0]  # dosis oral inicial
+
+t = np.linspace(0, 72, 400)
+
+sol = odeint(modelo, y0, t)
+
+N0, B, S, I, Cp, Ct, Cu, Cn, Cd = sol.T
+
+
+# ============================================================
+# GRÁFICA DIGESTIVA
+# ============================================================
+
+plt.figure(figsize=(9,5))
+plt.plot(t, N0, label="Nanoemulsión oral")
+plt.plot(t, B, label="Boca")
+plt.plot(t, S, label="Estómago")
+plt.plot(t, I, label="Intestino")
+
+plt.title("Tránsito gastrointestinal")
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Cantidad relativa")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ============================================================
+# GRÁFICA SISTÉMICA
+# ============================================================
+
+plt.figure(figsize=(9,5))
+plt.plot(t, Cp, label="Plasma")
+plt.plot(t, Ct, label="Tejido normal")
+plt.plot(t, Cu, label="Tumor (EPR)")
+
+plt.title("Distribución sistémica")
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Concentración relativa")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ============================================================
+# GRÁFICA INTRACELULAR
+# ============================================================
+
+plt.figure(figsize=(9,5))
+plt.plot(t, Cn, label="SNEDDS intracelular tumoral")
+plt.plot(t, Cd, label="CPT libre intracelular")
+
+plt.title("Liberación intracelular de CPT")
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Cantidad relativa")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# ============================================================
+# MÉTRICAS CLAVE
+# ============================================================
+
+print("\n================ RESULTADOS CLAVE =================")
+
+print(f"Cmax plasmática = {Cp.max():.3f}")
+print(f"Cmax tumoral = {Cu.max():.3f}")
+print(f"Cmax CPT intracelular = {Cd.max():.3f}")
+
+print(f"Tmax tumoral ≈ {t[np.argmax(Cu)]:.2f} h")
+print(f"Tmax CPT ≈ {t[np.argmax(Cd)]:.2f} h")
+
+
+
+print("\n================ EFECTO ANTITUMORAL (DOCKING) =================")
+
+# ============================================================
+# USAR RESULTADOS DEL MODELO GLOBAL
+# ============================================================
+
+# t  = vector de tiempo del modelo principal
+# Cd = CPT libre intracelular obtenido antes
+
+
+# ============================================================
+# PARÁMETROS DESDE DOCKING
+# ============================================================
+
+deltaG = -9.5      # 👈 CAMBIA por tu valor real
+
+R = 1.987e-3       # kcal/mol·K
+T = 310            # K
+
+Kd = np.exp(deltaG/(R*T))
+
+# Potencia farmacológica relativa
+k_kill = 1 / (1 + Kd)
+
+
+# ============================================================
+# MODELO TUMORAL
+# ============================================================
+
+def modelo_tumor(y, t_local):
+    Tcells = y[0]
+
+    # CPT intracelular en ese instante
+    Cdrug = np.interp(t_local, t, Cd)
+
+    r = 0.03   # crecimiento tumoral basal
+
+    dT = r*Tcells - k_kill*Cdrug*Tcells
+
+    return [dT]
+
+
+# ============================================================
+# SIMULACIÓN
+# ============================================================
+
+T0 = [1.0]   # tamaño tumoral inicial
+
+sol_tumor = odeint(modelo_tumor, T0, t)
+
+Tcells = sol_tumor[:, 0]
+
+
+# ============================================================
+# GRÁFICA
+# ============================================================
+
+plt.figure(figsize=(8,5))
+plt.plot(t, Tcells)
+
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Tamaño tumoral relativo")
+plt.title("Respuesta tumoral a CPT (basado en docking)")
+plt.grid(True)
+plt.show()
+
+
+# ============================================================
+# RESULTADOS
+# ============================================================
+
+print(f"Kd estimado = {Kd:.4e}")
+print(f"Potencia relativa = {k_kill:.4f}")
+print(f"Tamaño tumoral final = {Tcells[-1]:.3f}")

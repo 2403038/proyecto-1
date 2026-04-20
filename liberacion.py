@@ -487,6 +487,88 @@ plt.show()
 
 
 
+# ============================================================
+# 🧬 DISTRIBUCIÓN POST-ABSORCIÓN (PLASMA → CÉLULA)
+# ============================================================
+
+print("\n================ DISTRIBUCIÓN SISTÉMICA =================")
+
+from scipy.integrate import odeint
+
+# -------------------------
+# PARÁMETROS
+# -------------------------
+
+Fa = 0.54      # fracción absorbida (de tu modelo)
+Ka = 1.2       # velocidad absorción al plasma
+Ke = 0.4       # eliminación plasmática
+
+Kpt = 0.8      # plasma → tejido
+Ktp = 0.5      # tejido → plasma
+
+Ktc = 0.6      # tejido → célula
+Kct = 0.3      # célula → tejido
+
+Kdeg = 0.1     # degradación intracelular
+
+# -------------------------
+# SISTEMA DE ECUACIONES
+# -------------------------
+
+def modelo(y, t):
+    Cp, Ct, Cc = y
+    
+    dCp = Ka*Fa - Ke*Cp - Kpt*Cp + Ktp*Ct
+    dCt = Kpt*Cp - Ktp*Ct - Ktc*Ct + Kct*Cc
+    dCc = Ktc*Ct - Kct*Cc - Kdeg*Cc
+    
+    return [dCp, dCt, dCc]
+
+# -------------------------
+# CONDICIONES INICIALES
+# -------------------------
+
+y0 = [0, 0, 0]   # al inicio no hay fármaco en sangre
+
+t = np.linspace(0, 24, 200)  # horas
+
+# -------------------------
+# SIMULACIÓN
+# -------------------------
+
+sol = odeint(modelo, y0, t)
+
+Cp = sol[:,0]
+Ct = sol[:,1]
+Cc = sol[:,2]
+
+# -------------------------
+# GRÁFICA
+# -------------------------
+
+plt.figure(figsize=(8,5))
+plt.plot(t, Cp, label="Plasma")
+plt.plot(t, Ct, label="Tejido")
+plt.plot(t, Cc, label="Intracelular")
+
+plt.xlabel("Tiempo (h)")
+plt.ylabel("Concentración relativa")
+plt.title("Destino del SNEDDS tras absorción intestinal")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# -------------------------
+# MÉTRICAS CLAVE
+# -------------------------
+
+print(f"Concentración máxima plasmática (Cmax) = {Cp.max():.3f}")
+print(f"Concentración intracelular máxima = {Cc.max():.3f}")
+print(f"Tiempo a Cmax celular ≈ {t[np.argmax(Cc)]:.2f} h")
+
+
+
+
 
 
 
